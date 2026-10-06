@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 import httpx
 
+
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.ollama_service import generate_response
 
@@ -9,7 +10,12 @@ router = APIRouter()
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
-        answer = await generate_response(request.message)
+        messages = [
+            message.model_dump()
+            for message in request.messages
+        ]
+        
+        answer = await generate_response(messages)
         return ChatResponse(
             answer = answer
         )
