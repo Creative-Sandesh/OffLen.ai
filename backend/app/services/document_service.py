@@ -1,9 +1,11 @@
 from pathlib import Path
 from uuid import uuid4
+import asyncio
 
 from fastapi import UploadFile, HTTPException
 from pypdf import PdfReader
 
+from app.services.embedding_service import generate_embeddings
 from app.services.chunking_service import chunk_text
 
 DOCUMENT_DIR = Path("app/data/documents")
@@ -62,23 +64,23 @@ async def process_document(file: UploadFile):
         file_path.unlink(missing_ok=True)
 
         raise HTTPException(status_code=422, detail="No readable text found in document.")
+    
     chunks = chunk_text(
         text=text,
         document_id=document_id
     )
-    for chunk in chunks[:3]:
-        print(
-            "\nCHUNK:",
-            chunk["chunk_index"],
-            "\n",
-            chunk["text"]
-        )
+    
+    embedded_chunks = await asyncio.to_thread(
+    generate_embeddings,
+    chunks)
+    
+    
     return{
         "document_id": document_id,
         "filename": file.filename,
         "content_type": file.content_type or "unknown",
         "characters": len(text),
-        "chunks": chunks,
+        "chunks": embedded_chunks,
         "status": "processed",
         "text": text
         

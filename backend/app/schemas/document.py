@@ -6,6 +6,8 @@ class DocumentUploadResponse(BaseModel):
     content_type: str
     characters : int
     chunks: int
+    embeddings: int
+    embedding_dimension: int
     status : str
     
 class DocumentChunk(BaseModel):
