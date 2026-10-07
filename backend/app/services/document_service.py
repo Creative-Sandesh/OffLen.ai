@@ -7,6 +7,7 @@ from pypdf import PdfReader
 
 from app.services.embedding_service import generate_embeddings
 from app.services.chunking_service import chunk_text
+from app.services.vector_store_service import (store_chunks,get_vector_count)
 
 DOCUMENT_DIR = Path("app/data/documents")
 
@@ -71,8 +72,18 @@ async def process_document(file: UploadFile):
     )
     
     embedded_chunks = await asyncio.to_thread(
-    generate_embeddings,
-    chunks)
+    generate_embeddings,chunks)
+    
+    stored_chunks = await asyncio.to_thread(
+    store_chunks,
+    embedded_chunks,
+    file.filename
+)
+
+
+    vector_store_total = await asyncio.to_thread(
+        get_vector_count
+    )
     
     
     return{
@@ -81,6 +92,8 @@ async def process_document(file: UploadFile):
         "content_type": file.content_type or "unknown",
         "characters": len(text),
         "chunks": embedded_chunks,
+        "stored_chunks": stored_chunks,
+        "vector_store_total": vector_store_total,
         "status": "processed",
         "text": text
         

@@ -1,320 +1,220 @@
 import {
-  FormEvent,
   useEffect,
-  useRef,
   useState,
 } from "react";
 
+import ChatBox from "./components/ChatBox";
+import DocumentList from "./components/DocumentList";
+import DocumentUpload from "./components/DocumentUpload";
+
+import {
+  deleteDocument,
+  getDocuments,
+} from "./services/api";
+
+import type {
+  DocumentSummary,
+  UploadResponse,
+} from "./types/chat";
+
 import "./App.css";
 
-
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-}
-
-
 function App() {
+  const [documents, setDocuments] =
+    useState<DocumentSummary[]>([]);
 
-  const [message, setMessage] =
+  const [
+    activeDocumentId,
+    setActiveDocumentId,
+  ] = useState<string | null>(null);
+
+  const [
+    loadingDocuments,
+    setLoadingDocuments,
+  ] = useState(true);
+
+  const [error, setError] =
     useState("");
 
-  const [messages, setMessages] =
-    useState<Message[]>([]);
-
-  const [loading, setLoading] =
-    useState(false);
-
-  const messagesEndRef =
-    useRef<HTMLDivElement | null>(null);
-
-
   useEffect(() => {
+    loadDocuments();
+  }, []);
 
-    messagesEndRef.current?.scrollIntoView({
-      behavior: "smooth",
-    });
-
-  }, [messages, loading]);
-
-
-  const sendMessage = async (
-    event: FormEvent
-  ) => {
-
-    event.preventDefault();
-
-
-    const trimmedMessage =
-      message.trim();
-
-
-    if (!trimmedMessage || loading) {
-      return;
-    }
-
-
-    const userMessage: Message = {
-      role: "user",
-      content: trimmedMessage,
-    };
-
-
-    /*
-       Include previous conversation
-       plus the new user message.
-    */
-    const conversation = [
-      ...messages,
-      userMessage,
-    ];
-
-
-    setMessages(conversation);
-
-    setMessage("");
-
-    setLoading(true);
-
-
+  async function loadDocuments() {
     try {
+      setLoadingDocuments(true);
+      setError("");
 
-      const response = await fetch(
-        "http://localhost:8000/api/chat",
-        {
-          method: "POST",
+      const response =
+        await getDocuments();
 
-          headers: {
-            "Content-Type":"application/json",
-          },
-
-          body: JSON.stringify({
-            messages: conversation,
-          }),
-        }
+      setDocuments(
+        response.documents
       );
 
+      if (
+        response.documents.length > 0
+      ) {
+        setActiveDocumentId(
+          response.documents[0]
+            .document_id
+        );
+      }
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load documents."
+      );
+    } finally {
+      setLoadingDocuments(false);
+    }
+  }
 
-      if (!response.ok) {
-        throw new Error(
-          "Failed to get AI response"
+  function handleUploadSuccess(
+    uploaded: UploadResponse
+  ) {
+    const newDocument:
+      DocumentSummary = {
+      document_id:
+        uploaded.document_id,
+
+      filename:
+        uploaded.filename,
+
+      chunks:
+        uploaded.chunks,
+    };
+
+    setDocuments((previous) => [
+      newDocument,
+      ...previous.filter(
+        (document) =>
+          document.document_id !==
+          newDocument.document_id
+      ),
+    ]);
+
+    setActiveDocumentId(
+      newDocument.document_id
+    );
+  }
+
+  async function handleDeleteDocument(
+    documentId: string
+  ) {
+    await deleteDocument(
+      documentId
+    );
+
+    setDocuments((previous) => {
+      const remaining =
+        previous.filter(
+          (document) =>
+            document.document_id !==
+            documentId
+        );
+
+      if (
+        activeDocumentId ===
+        documentId
+      ) {
+        setActiveDocumentId(
+          remaining[0]
+            ?.document_id ?? null
         );
       }
 
+      return remaining;
+    });
+  }
 
-      const data = await response.json();
-      const assistantMessage: Message = {
-        role: "assistant",
-        content: data.answer,
-      };
-
-      setMessages([
-        ...conversation,
-        assistantMessage,
-      ]);
-    } catch (error) {
-      console.error(error);
-      const errorMessage: Message = {
-        role: "assistant",
-        content:"Sorry, I could not connect to the AI server.",
-      };
-      setMessages([
-        ...conversation,
-        errorMessage,
-      ]);
-
-    } finally {
-
-      setLoading(false);
-
-    }
-
-  };
-
-
-  const clearConversation = () => {
-
-    setMessages([]);
-
-  };
-
+  const activeDocument =
+    documents.find(
+      (document) =>
+        document.document_id ===
+        activeDocumentId
+    );
 
   return (
-
     <div className="app">
+      <header className="app-header">
+        <div className="brand">
+          <div className="brand-icon">
+            AI
+          </div>
 
-      <header className="header">
+          <div>
+            <h1>
+              Offline AI Learning Assistant
+            </h1>
 
-        <div>
-
-          <h1>
-            AI Learning Assistant
-          </h1>
-
-          <p>
-            Powered locally by Ollama
-          </p>
-
+            <p>
+              Local document intelligence
+            </p>
+          </div>
         </div>
 
+        {activeDocument && (
+          <div className="active-document">
+            <span>
+              Active document
+            </span>
 
-        <div className="header-actions">
-
-          {messages.length > 0 && (
-
-            <button
-              className="clear-button"
-              onClick={clearConversation}
-            >
-              New Chat
-            </button>
-
-          )}
-
-
-          <span className="status">
-            Local AI
-          </span>
-
-        </div>
-
+            <strong>
+              {activeDocument.filename}
+            </strong>
+          </div>
+        )}
       </header>
 
-
-      <main className="chat-container">
-
-        <div className="messages">
-
-
-          {messages.length === 0 && (
-
-            <div className="welcome">
-
-              <h2>
-                What would you like
-                to learn?
-              </h2>
-
-              <p>
-                Ask a question and continue
-                the conversation with your
-                AI tutor.
-              </p>
-
-            </div>
-
-          )}
-
-
-          {messages.map(
-            (chatMessage, index) => (
-
-              <div
-
-                key={index}
-
-                className={
-                  `message ${
-                    chatMessage.role
-                  }`
-                }
-
-              >
-
-                <div className="message-label">
-
-                  {
-                    chatMessage.role ===
-                    "user"
-                      ? "You"
-                      : "AI Tutor"
-                  }
-
-                </div>
-
-
-                <div className="message-content">
-
-                  {chatMessage.content}
-
-                </div>
-
-              </div>
-
-            )
-          )}
-
-
-          {loading && (
-
-            <div className="message assistant">
-
-              <div className="message-label">
-                AI Tutor
-              </div>
-
-              <div className="message-content">
-                Thinking...
-              </div>
-
-            </div>
-
-          )}
-
-
-          <div ref={messagesEndRef} />
-
-        </div>
-
-
-        <form
-          className="chat-form"
-          onSubmit={sendMessage}
-        >
-
-          <input
-
-            type="text"
-
-            value={message}
-
-            onChange={(event) =>
-              setMessage(
-                event.target.value
-              )
+      <main className="main-container">
+        <aside className="document-sidebar">
+          <DocumentUpload
+            onUploadSuccess={
+              handleUploadSuccess
             }
-
-            placeholder={
-              "Ask a follow-up question..."
-            }
-
-            disabled={loading}
-
           />
 
+          {loadingDocuments ? (
+            <div className="document-loading">
+              Loading documents...
+            </div>
+          ) : (
+            <DocumentList
+              documents={documents}
+              activeDocumentId={
+                activeDocumentId
+              }
+              onSelect={
+                setActiveDocumentId
+              }
+              onDelete={
+                handleDeleteDocument
+              }
+            />
+          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-          >
+          {error && (
+            <div className="upload-error">
+              {error}
+            </div>
+          )}
+        </aside>
 
-            {
-              loading
-                ? "Thinking..."
-                : "Send"
+        <section className="chat-workspace">
+          <ChatBox
+            documentId={
+              activeDocumentId
             }
-
-          </button>
-
-        </form>
-
+            documentName={
+              activeDocument?.filename
+            }
+          />
+        </section>
       </main>
-
     </div>
-
   );
-
 }
-
 
 export default App;

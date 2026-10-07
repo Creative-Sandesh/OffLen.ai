@@ -43,3 +43,16 @@ def generate_embeddings(chunks: list[dict]) -> list[dict]:
         embedded_chunks.append(embedded_chunk)
 
     return embedded_chunks
+
+def generate_query_embedding(query:str) -> list[float]:
+    if not query.strip():
+        raise ValueError("Query cannot be empty.")
+
+    model = get_embedding_model()
+    
+    embedding = model.encode(
+        query,
+        convert_to_numpy=True,
+        normalize_embeddings=True
+    )
+    return embedding.tolist()
