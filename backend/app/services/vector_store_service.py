@@ -168,7 +168,7 @@ def search_chunks(
     ):
 
         distance = (
-            results["distances"][0][index]
+            results["distances"][0][index] # type: ignore
         )
 
         document_text = (
@@ -176,7 +176,7 @@ def search_chunks(
         )
 
         metadata = (
-            results["metadatas"][0][index]
+            results["metadatas"][0][index] # type: ignore
         )
 
         retrieved_chunks.append(
